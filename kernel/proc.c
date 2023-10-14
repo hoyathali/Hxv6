@@ -746,4 +746,5 @@ uint64 procinfo(struct pinfo *param)
   param->page_usage=(p->sz +4095)/ 4096;
   copyout(p->pagetable,n,(char *)param, sizeof(*param));
   return 1;
+  //a
 }
