@@ -6,10 +6,10 @@
 #include "proc.h"
 #include "syscall.h"
 #include "defs.h"
-#include "custom.h"
+#include "custom.h"                  // header file for storing our custom struct pinfo
 
-int syscallcounter=0;
-int syscalltillnow=0;
+int syscallcounter=0;                //variable for storing all system call counts including the current
+int syscalltillnow=0;                //variable for storing all system call counts excluding the current
 // Fetch the uint64 at addr from the current process.
 int
 fetchaddr(uint64 addr, uint64 *ip)
@@ -105,8 +105,8 @@ extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_hello(void);
-extern int sys_sysinfo(void);       // System Call pointer for getting sys_info
-extern int sys_procinfo(struct pinfo* param);
+extern int sys_sysinfo(void);                   // System Call pointer for getting sys_info
+extern int sys_procinfo(struct pinfo* param);   // System Call pointer for getting sys_procinfo
 
 
 // An array mapping syscall numbers from syscall.h
@@ -134,8 +134,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_hello]   sys_hello,
-[SYS_sysinfo]   (uint64(*)(void))  sys_sysinfo,    // System Call pointer for getting sys_info
-[SYS_procinfo]  (uint64(*)(void)) sys_procinfo,
+[SYS_sysinfo]   (uint64(*)(void))  sys_sysinfo,    // System Call pointer for getting sys_sysinfo
+[SYS_procinfo]  (uint64(*)(void)) sys_procinfo,    // system call pointer for getting sys_procinfo
 };
 
 

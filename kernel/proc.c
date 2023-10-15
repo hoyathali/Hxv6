@@ -5,12 +5,11 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include "kmem.h"
-#include "custom.h"
-#include <stdint.h>
-#include <math.h>
+#include "kmem.h"             // structure of kmem 
+#include "custom.h"          //structure of our custom pinfo struct
 
-extern int syscalltillnow;
+
+extern int syscalltillnow;   // exetrn variable for obtaining syscalls made till now
 
 struct cpu cpus[NCPU];
 
@@ -118,10 +117,7 @@ allocproc(void)
   struct proc *p;
  
   for(p = proc; p < &proc[NPROC]; p++) {
-    acquire(&p->lock);
-     p->systemcalls=0;
-     p->systemcallstillnow=0;
-     
+    acquire(&p->lock); 
     if(p->state == UNUSED) {
       goto found;
     } else {
@@ -133,6 +129,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+
+// initialize two variables to keep a count of system calls of current process. 
+  p->systemcalls=0;
+  p->systemcallstillnow=0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -708,43 +708,59 @@ uint64 print_info(int n)
         };
         struct proc *p;
         int activeProcessCounter=0;
-
-        for(p = proc; p < &proc[NPROC]; p++){
+        for(p = proc; p < &proc[NPROC]; p++){                                     //count proceses which are waiting-sleep, runable-ready, running-run and zoombie
           if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
             activeProcessCounter++;        
           } 
-     //   printf("\n Total number of Active processes in system %d  \n",activeProcessCounter);   
-        return activeProcessCounter;  
+        return activeProcessCounter;                                              // returnt the count
   }
-  else if (n==1) return syscalltillnow;
 
+else if (n==1) 
+  {
+      return syscalltillnow;              // return system calls till now without counting the current call
+  }
+ 
  else if(n==2)
  {
-   struct run *r = kmem.freelist;
+   struct run *r = kmem.freelist; 
     int count = 0;
-    while (r) {
+    while (r) {                           //While linkedlist is not empty, loop and count 
     count++;
     r = r->next;
   }
-    //printf("\n Free memory pages in the system %d \n",count==0?-1:count);
     return count;  
  }
- return -1;
+ return -1;                               //return -1 incase of any errors or invalid arguments
 } 
 
 
 
 uint64 procinfo(struct pinfo *param)
 {
-  
-  struct proc *p = myproc();
-  
+  //Extract space pointer from arguments
   uint64 n;
   argaddr(0,&n); 
-  param->syscall_count=p->systemcallstillnow;
-  param->ppid=23;
-  param->page_usage=(p->sz +4095)/ 4096;
-  copyout(p->pagetable,n,(char *)param, sizeof(*param));
-  return 1;
-  //a
+
+  // get current process for pid,syscount and page_usage
+  struct proc *p = myproc();
+  
+  //Set data from PCB to struct param
+
+  param->syscall_count=p->systemcallstillnow;   //System calls till now wihout counting current systel call 
+  param->ppid=p->parent->pid;
+  param->page_usage=(p->sz +4095)/ 4096;        // dividing with 4096 as its size of one page and ceiling it (numerator +denominator -1)/ denominator
+  
+  //Copy data from kernal space to user space
+
+  if(copyout(p->pagetable,n,(char *)param, sizeof(*param))==0)
+  {
+  return 0;   // when copyout is success
+   }
+  else{
+   return -1; // when copy out is failure
+  }
+
+
+
+
 }

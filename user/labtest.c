@@ -1,12 +1,9 @@
 #include "kernel/types.h"
 #include "kernel/stat.h"
 #include "user/user.h"
+#include "kernel/custom.h"
 #define MAX_PROC 10
-struct pinfo {
-int ppid;
-int syscall_count;
-int page_usage;
-};
+
 void print_sysinfo(void)
 {
 int n_active_proc, n_syscalls, n_free_pages;
