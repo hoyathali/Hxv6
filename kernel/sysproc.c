@@ -114,6 +114,18 @@ sys_sysinfo(void)   // Sysinfo syscall definition
 uint64
 sys_procinfo(struct pinfo* param)
 {
-
   return procinfo(param);
+}
+
+uint64
+sys_sched_statistics(void)
+{
+  return sched_statistics();
+}
+uint64
+sys_sched_tickets(void)
+{
+  int n;
+  argint(0,&n);
+  return sched_tickets(n);
 }

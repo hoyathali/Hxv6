@@ -70,6 +70,8 @@ endif
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
 CFLAGS += -fno-pie -nopie
 endif
+LAB2=RR
+CFLAGS +=-D$(LAB2)
 
 LDFLAGS = -z max-page-size=4096
 
@@ -134,6 +136,8 @@ UPROGS=\
 	$U/_zombie\
 	$U/_test\
 	$U/_labtest\
+	$U/_labtest2\
+	$U/_lab2\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

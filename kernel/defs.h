@@ -110,6 +110,8 @@ void            procdump(void);
 void            print_hello(int);   // hello
 uint64          print_info(int);
 uint64          procinfo(struct pinfo *param);
+uint64          sched_tickets(int);
+uint64          sched_statistics(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

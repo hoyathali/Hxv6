@@ -2,6 +2,7 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 #include "kernel/custom.h"
+
 #define MAX_PROC 10
 
 void print_sysinfo(void)

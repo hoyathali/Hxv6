@@ -6,7 +6,6 @@
 #include "proc.h"
 #include "syscall.h"
 #include "defs.h"
-#include "custom.h"                  // header file for storing our custom struct pinfo
 
 int syscallcounter=0;                //variable for storing all system call counts including the current
 int syscalltillnow=0;                //variable for storing all system call counts excluding the current
@@ -105,8 +104,10 @@ extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_hello(void);
-extern int sys_sysinfo(void);                   // System Call pointer for getting sys_info
-extern int sys_procinfo(struct pinfo* param);   // System Call pointer for getting sys_procinfo
+extern int sys_sysinfo(void);     // System Call pointer for getting sys_info
+extern int sys_procinfo(void);   // System Call pointer for getting sys_procinfo
+extern int sys_sched_statistics(void);
+extern int sys_sched_tickets(void);
 
 
 // An array mapping syscall numbers from syscall.h
@@ -136,6 +137,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_hello]   sys_hello,
 [SYS_sysinfo]   (uint64(*)(void))  sys_sysinfo,    // System Call pointer for getting sys_sysinfo
 [SYS_procinfo]  (uint64(*)(void)) sys_procinfo,    // system call pointer for getting sys_procinfo
+[SYS_sched_statistics]  (uint64(*)(void)) sys_sched_statistics,
+[SYS_sched_tickets]     (uint64(*)(void)) sys_sched_tickets,
 };
 
 
@@ -150,12 +153,10 @@ syscall(void)
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
-        syscalltillnow=syscallcounter;
-        syscallcounter++;   
-        p->systemcallstillnow = p->systemcalls;
-        p->systemcalls=p->systemcalls+1;
-    // Incrementing the system call count 
-
+        syscalltillnow=syscallcounter;                    //Set syscall counter to syscalltill now before incrementing the current system call
+        syscallcounter++;                                 //Increment the current system call to the counter
+        p->systemcallstillnow = p->systemcalls;           //Set syscallcounterofprocess to syscalltillnow  before incrementing the current system call of process
+        p->systemcalls++;                 //Increment the current system call of the process to the counter
     p->trapframe->a0 = syscalls[num]();
   } else {
     printf("%d %s: unknown sys call %d\n",

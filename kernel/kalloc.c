@@ -73,3 +73,15 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+int 
+getFreeMemory(void)
+{
+   struct run *r = kmem.freelist; 
+    int count = 0;
+    while (r) {                           //While linkedlist is not empty, loop and count 
+    count++;
+    r = r->next;
+  }
+    return count;  
+}

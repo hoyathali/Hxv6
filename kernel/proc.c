@@ -7,9 +7,13 @@
 #include "defs.h"
 #include "kmem.h"             // structure of kmem 
 #include "custom.h"          //structure of our custom pinfo struct
+#include "kalloc.h"
 
 
 extern int syscalltillnow;   // exetrn variable for obtaining syscalls made till now
+
+int totalticketsissued=0;
+long K=10000;
 
 struct cpu cpus[NCPU];
 
@@ -133,7 +137,15 @@ found:
 // initialize two variables to keep a count of system calls of current process. 
   p->systemcalls=0;
   p->systemcallstillnow=0;
-
+  
+  p->tickets=10000;
+  p->ticketstart=totalticketsissued;
+  p->ticketend=p->ticketstart+p->tickets-1;
+  totalticketsissued +=p->tickets;
+  p->stride=K/p->tickets;
+  p->passvalue=p->stride;
+ // printf(" pid %d tickets %d stride %d passvalue  %d \n", p->pid,p->tickets,p->stride,p->passvalue);
+  p->executedtime=0;
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -450,13 +462,88 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+
+//Random number Generator Function for lottery scheduler
+unsigned short lfsr = 0xACE1u;
+unsigned short bit;
+unsigned short rand()
+    {
+      bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5)) & 1;
+      lfsr = (lfsr >> 1) | (bit << 15);
+      return lfsr % totalticketsissued; 
+    }
+
+int getMinimumPassValue(void)
+{
+     int minPassValue=99999;
+     struct proc *p;
+     for(p = proc; p < &proc[NPROC]; p++) {
+       if(p->state == RUNNABLE && p->passvalue<=minPassValue)
+        {
+          minPassValue=p->passvalue;
+        }
+        }
+      return minPassValue;
+}
+
+
+
 void
 scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
+
   c->proc = 0;
+
+#if defined(STRIDE)
+   for(;;)
+  {
+    intr_on();
+      
+
+       for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+         if(p->state == RUNNABLE && p->passvalue==getMinimumPassValue()) {
+              p->state = RUNNING;
+              c->proc = p;
+              p->executedtime +=1;
+              p->passvalue += p->stride;
+              swtch(&c->context, &p->context);
+              c->proc = 0;
+          }
+        release(&p->lock);
+      }
+    }
+    
+  #elif defined(LOTTERY)
+  
+  for(;;)
+  {
+    intr_on();
+    long lottery=rand();
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+
+      if(p->state == RUNNABLE && (lottery>= p->ticketstart && lottery<=p->ticketend )) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        //printf("lottery %d %d %d \n",lottery, p->ticketstart, p->ticketend);
+        p->state = RUNNING;
+        c->proc = p;
+          p->executedtime +=1;
+        swtch(&c->context, &p->context);
+      
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&p->lock);
+    }
+  }
+  #else
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
@@ -469,7 +556,9 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        p->executedtime +=1;
         swtch(&c->context, &p->context);
+        
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -478,6 +567,10 @@ scheduler(void)
       release(&p->lock);
     }
   }
+    
+  #endif
+
+
 }
 
 // Switch to scheduler.  Must hold only p->lock
@@ -700,6 +793,17 @@ uint64 print_info(int n)
 {
  if(n==0)
  {
+
+  //----------------------------------------Approach one--------------------------------------------------------
+     //   for(p = proc; p < &proc[NPROC]; p++){                                     //count proceses which are waiting-sleep, runable-ready, running-run and zoombie
+     //         if(p->state != UNUSED || p->state != USED)
+     //           continue;
+     //           else 
+     //           activeProcessCounter++;      
+     //           } 
+
+  //-----------------------------------------------------------------------------------------------------------
+  //----------------------------------------Appraoch two ------------------------------------------------------
          static char *states[] = {
         [SLEEPING]  "sleep ",      // waiting
         [RUNNABLE]  "runble",      // ready
@@ -713,6 +817,7 @@ uint64 print_info(int n)
             activeProcessCounter++;        
           } 
         return activeProcessCounter;                                              // returnt the count
+  //------------------------------------------------------------------------------------------------------------
   }
 
 else if (n==1) 
@@ -722,13 +827,18 @@ else if (n==1)
  
  else if(n==2)
  {
-   struct run *r = kmem.freelist; 
-    int count = 0;
-    while (r) {                           //While linkedlist is not empty, loop and count 
-    count++;
-    r = r->next;
-  }
-    return count;  
+  //------------------------------Approach One-------------------------------------------------------
+  // struct run *r = kmem.freelist; 
+  //  int count = 0;
+  //  while (r) {                           //While linkedlist is not empty, loop and count 
+  //  count++;
+  //  r = r->next;
+  //    }
+  //  return count;  
+  //------------------------------Appraoch Two--------------------------------------------------------
+    return getFreeMemory();                 // A new funciton getFreeMemory was implemented in kalloc.c to return the free memory
+                                            // Included kalloc.h which includes this funciton definition
+  //---------------------------------------------------------------------------------------------------
  }
  return -1;                               //return -1 incase of any errors or invalid arguments
 } 
@@ -740,27 +850,55 @@ uint64 procinfo(struct pinfo *param)
   //Extract space pointer from arguments
   uint64 n;
   argaddr(0,&n); 
-
   // get current process for pid,syscount and page_usage
   struct proc *p = myproc();
-  
   //Set data from PCB to struct param
 
   param->syscall_count=p->systemcallstillnow;   //System calls till now wihout counting current systel call 
   param->ppid=p->parent->pid;
   param->page_usage=(p->sz +4095)/ 4096;        // dividing with 4096 as its size of one page and ceiling it (numerator +denominator -1)/ denominator
-  
   //Copy data from kernal space to user space
-
+ 
   if(copyout(p->pagetable,n,(char *)param, sizeof(*param))==0)
-  {
   return 0;   // when copyout is success
-   }
-  else{
-   return -1; // when copy out is failure
+  else return -1; // when copy out is failure
+
+}
+
+uint64 sched_statistics(void)
+{
+struct proc *p;
+ for(p = proc; p < &proc[NPROC]; p++){
+ if(p->pid>0)
+ {
+  printf("%d (%s) : tickets: %d ( %d %d), ticks: %d \n",p->pid,p->name,p->tickets,p->ticketstart,p->ticketend,p->executedtime);    //For all processes print pid, name , tickets and its executedtime
+ }  
+ }
+  return 0;
+}
+
+uint64 sched_tickets(int newtickets)
+{
+  if(newtickets>10000)
+  {
+    return 0;
   }
-
-
-
-
+  else{
+    // Balancing lottery tickets and their ranges across all the processors
+    struct proc *p;
+    struct proc *currProc;
+    currProc=myproc();
+    int temptickets=0;     
+     for(p = proc; p < &proc[NPROC]; p++){
+        if (p == currProc) {
+          p->tickets = newtickets;
+          }
+          p->ticketstart=temptickets;
+          p->ticketend = p->ticketstart + p->tickets -1;  // set ticket ending to start + number of tickets
+          temptickets += p->tickets;                      // increments nex ticket counter
+          p->stride=K/p->tickets;
+     }
+     totalticketsissued=temptickets;
+    return 0; 
+  }
 }
