@@ -137,15 +137,17 @@ found:
 // initialize two variables to keep a count of system calls of current process. 
   p->systemcalls=0;
   p->systemcallstillnow=0;
-  
-  p->tickets=100;
+  p->tickets=10000;
+
+
   p->ticketstart=totalticketsissued;
   p->ticketend=p->ticketstart+p->tickets-1;
-  totalticketsissued +=p->tickets;
-  p->stride=K/p->tickets;
   
+  totalticketsissued +=p->tickets;
+
+  p->stride=K/p->tickets;
   p->passvalue=p->stride;
- p->executedtime=0;
+  p->executedtime=0;
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -524,9 +526,9 @@ scheduler(void)
   {
     intr_on();
     long lottery=rand();
+
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-
       if(p->state == RUNNABLE && (lottery>= p->ticketstart && lottery<=p->ticketend )) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
@@ -536,7 +538,6 @@ scheduler(void)
         c->proc = p;
           p->executedtime +=1;
         swtch(&c->context, &p->context);
-      
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -873,7 +874,7 @@ struct proc *p;
  for(p = proc; p < &proc[NPROC]; p++){
  if(p->pid>0)
  {
-  printf("%d (%s) : tickets: %d, ticks: %d \n",p->pid,p->name,p->tickets,p->executedtime);    //For all processes print pid, name , tickets and its executedtime
+  printf("%d (%s) : tickets: %d %d %d, ticks: %d \n",p->pid,p->name,p->tickets, p->ticketstart , p->ticketend ,p->executedtime);    //For all processes print pid, name , tickets and its executedtime
  }  
  }
   return 0;
@@ -885,7 +886,7 @@ uint64 sched_tickets(int newtickets)
   {
     return 0;
   }
-  else{
+   else{
     // Balancing lottery tickets and their ranges across all the processors
     struct proc *p;
     struct proc *currProc;
@@ -896,8 +897,8 @@ uint64 sched_tickets(int newtickets)
           p->tickets = newtickets;
           }
           p->ticketstart=temptickets;
-          p->ticketend = p->ticketstart + p->tickets -1;  // set ticket ending to start + number of tickets
-          temptickets += p->ticketend +1;                      // increments nex ticket counter
+          p->ticketend = p->ticketstart + p->tickets -1;  
+          temptickets += p->tickets;                      
           p->stride=K/p->tickets;
           p->passvalue=p->stride;
      }
